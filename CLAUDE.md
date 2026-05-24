@@ -1,5 +1,7 @@
 # CLAUDE.md — Poetry Card Generator
 
+**GitHub 仓库**：https://github.com/keselychen-dev/Poetry-Card-Generator-
+
 ## 项目概述
 
 小学生部编版古诗词图文卡片生成器，纯前端单文件应用。收录 101 首部编版古诗，支持 AI 生成诗意插画，导出 PNG 卡片。
