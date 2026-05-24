@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>古诗词卡片生成器</title>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;600;700&family=Long+Cang&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root {
+  --bg:#F5F0E6;--sidebar-bg:#2D2418;--sidebar-hover:#3D3428;
+  --sidebar-text:#D4C5A9;--sidebar-text-dim:#8B7B65;
+  --accent:#C04851;--accent-gold:#C8A96E;--accent-green:#5B8C5A;
+  --text:#2D2418;--text-dim:#8B7355;--border:#D4C5A9;--white:#FFF;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Serif SC',serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+.app{display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:300px;min-width:300px;background:var(--sidebar-bg);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.sidebar::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0v60M0 30h60' stroke='%23fff' stroke-width='.3' opacity='.04'/%3E%3C/svg%3E");pointer-events:none}
+.sidebar-header{padding:24px 20px 16px;border-bottom:1px solid rgba(200,169,110,.15);position:relative;z-index:1}
+.sidebar-logo{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.sidebar-logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),#E86B6B);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Ma Shan Zheng',cursive;font-size:20px;color:#fff}
+.sidebar-logo h1{font-family:'Ma Shan Zheng',cursive;font-size:22px;color:var(--accent-gold);font-weight:400;letter-spacing:2px}
+.sidebar-search{width:100%;padding:8px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(200,169,110,.2);border-radius:8px;color:var(--sidebar-text);font-family:'Noto Serif SC',serif;font-size:13px;outline:none;transition:all .2s}
+.sidebar-search::placeholder{color:var(--sidebar-text-dim)}
+.sidebar-search:focus{border-color:var(--accent-gold);background:rgba(255,255,255,.1)}
+.grade-filter{display:flex;gap:4px;padding:10px 20px;border-bottom:1px solid rgba(200,169,110,.1);overflow-x:auto;position:relative;z-index:1;scrollbar-width:none}
+.grade-filter::-webkit-scrollbar{display:none}
+.grade-btn{padding:4px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(200,169,110,.15);border-radius:6px;color:var(--sidebar-text-dim);font-size:12px;font-family:'Noto Serif SC',serif;cursor:pointer;white-space:nowrap;transition:all .2s}
+.grade-btn:hover{background:rgba(255,255,255,.1);color:var(--sidebar-text)}
+.grade-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.poem-list{flex:1;overflow-y:auto;padding:8px 0;position:relative;z-index:1}
+.poem-list::-webkit-scrollbar{width:4px}
+.poem-list::-webkit-scrollbar-thumb{background:rgba(200,169,110,.2);border-radius:4px}
+.semester-group{margin-bottom:4px}
+.semester-header{padding:8px 20px 4px;font-size:11px;color:var(--sidebar-text-dim);letter-spacing:2px}
+.poem-item{padding:10px 20px 10px 28px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;position:relative}
+.poem-item::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--sidebar-text-dim);position:absolute;left:20px;transition:all .2s}
+.poem-item:hover{background:var(--sidebar-hover)}
+.poem-item:hover::before{background:var(--accent-gold)}
+.poem-item.active{background:rgba(192,72,81,.15)}
+.poem-item.active::before{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.poem-item-title{font-size:14px;color:var(--sidebar-text);flex:1}
+.poem-item-author{font-size:11px;color:var(--sidebar-text-dim)}
+.poem-item-generated{width:6px;height:6px;border-radius:50%;background:var(--accent-green);flex-shrink:0}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.topbar{padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(245,240,230,.8);backdrop-filter:blur(10px)}
+.topbar-title{font-family:'ZCOOL XiaoWei',serif;font-size:15px;color:var(--text-dim)}
+.btn-icon{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;color:var(--text-dim);font-size:16px}
+.btn-icon:hover{border-color:var(--accent);color:var(--accent)}
+.content{flex:1;display:flex;overflow:hidden}
+
+/* PREVIEW */
+.preview-area{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto}
+
+/* CARD - NEW LAYOUT */
+.card-wrapper{position:relative;animation:fadeIn .4s ease;transition:opacity .3s ease,transform .3s ease}
+.card-wrapper.switching{opacity:0;transform:translateY(8px)}
+.card{width:440px;min-height:560px;height:auto;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 8px 32px rgba(45,36,24,.15),0 2px 8px rgba(45,36,24,.08);transition:transform .3s}
+.card:hover{transform:translateY(-2px)}
+
+/* Card border deco */
+.card-border{position:absolute;inset:10px;border:1px solid rgba(200,169,110,.25);border-radius:6px;pointer-events:none;z-index:2}
+.card-border::before,.card-border::after{content:'';position:absolute;width:20px;height:20px;border:1.5px solid rgba(200,169,110,.35)}
+.card-border::before{top:-1px;left:-1px;border-right:none;border-bottom:none;border-radius:4px 0 0 0}
+.card-border::after{bottom:-1px;right:-1px;border-left:none;border-top:none;border-radius:0 0 4px 0}
+
+.card-content{width:100%;padding:28px 24px 20px;position:relative;z-index:1}
+.card.theme-spring{background:linear-gradient(175deg,#FFF9F0 0%,#FFF5E6 35%,#E8F5E9 100%)}
+.card.theme-summer{background:linear-gradient(175deg,#FFF9F0 0%,#F0F8FF 35%,#E0F7FA 100%)}
+.card.theme-autumn{background:linear-gradient(175deg,#FFF9F0 0%,#FFF8F0 35%,#FFF3E0 100%)}
+.card.theme-winter{background:linear-gradient(175deg,#FFF9F0 0%,#F5F5FA 35%,#E8EAF6 100%)}
+.card.theme-classic{background:linear-gradient(175deg,#FFF9F0 0%,#F5F0E8 35%,#EFEBE9 100%)}
+
+.card-header{text-align:center;margin-bottom:16px}
+.card-title{font-family:'Ma Shan Zheng',cursive;font-size:42px;color:#2D2418;letter-spacing:8px;line-height:1.2}
+.card-author{font-family:'Noto Serif SC',serif;font-size:14px;color:#8B7355;letter-spacing:1px;margin-top:2px}
+.card-grade{font-family:'Noto Serif SC',serif;font-size:11px;color:#A89880;letter-spacing:1px;margin-top:4px;padding:2px 12px;border:1px solid rgba(200,169,110,.2);border-radius:10px;display:inline-block}
+.card-divider{width:40px;height:1px;background:linear-gradient(90deg,transparent,rgba(200,169,110,.5),transparent);margin:12px auto 14px}
+
+/* CARD BODY - text above, illustration below */
+.card-body{display:flex;flex-direction:column;overflow:hidden}
+
+/* Poem text zone */
+.card-text-zone{padding:0 28px 8px;display:flex;flex-direction:column;align-items:center;gap:0}
+.card-sentence{font-family:'ZCOOL XiaoWei',serif;font-size:20px;color:#2D2418;line-height:2.2;letter-spacing:3px;text-align:center}
+
+/* Illustration zone - lower portion */
+.card-illustration-zone{position:relative;min-height:250px;margin:4px 16px 12px;border-radius:8px;overflow:hidden}
+.card-illustration{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity .6s ease}
+.card-illustration-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .3s}
+.card-illustration-ph:hover{opacity:.85}
+.card-illustration-ph .ph-icon{font-size:40px;opacity:.2;margin-bottom:8px}
+.card-illustration-ph .ph-text{font-size:13px;color:rgba(100,80,60,.3);font-family:'Noto Serif SC',serif}
+.theme-spring .card-illustration-ph{background:linear-gradient(175deg,#FFF5E6,#E8F5E9)}
+.theme-summer .card-illustration-ph{background:linear-gradient(175deg,#F0F8FF,#E0F7FA)}
+.theme-autumn .card-illustration-ph{background:linear-gradient(175deg,#FFF8F0,#FFF3E0)}
+.theme-winter .card-illustration-ph{background:linear-gradient(175deg,#F5F5FA,#E8EAF6)}
+.theme-classic .card-illustration-ph{background:linear-gradient(175deg,#F5F0E8,#EFEBE9)}
+
+/* Decorative elements */
+.card-deco-sun{position:absolute;top:10px;right:14px;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#FFE082 30%,#FFD54F 70%,transparent 100%);opacity:.5;box-shadow:0 0 16px rgba(255,213,79,.25);z-index:2;pointer-events:none}
+.card-deco-wave{position:absolute;bottom:0;left:0;right:0;height:18px;z-index:2;pointer-events:none;opacity:.35;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 20'%3E%3Cpath d='M0 10 Q25 0 50 10 Q75 20 100 10 Q125 0 150 10 Q175 20 200 10 Q225 0 250 10 Q275 20 300 10 Q325 0 350 10 Q375 20 400 10 L400 20 L0 20Z' fill='%23ffffff'/%3E%3C/svg%3E") repeat-x bottom;background-size:200px 18px}
+.card-deco-lotus{position:absolute;bottom:8px;left:16px;z-index:2;pointer-events:none;opacity:.5;font-size:18px}
+.card-deco-cloud{position:absolute;top:8px;left:14px;z-index:2;pointer-events:none;opacity:.18;font-size:22px;color:#B0A090}
+
+/* Card explanation */
+.card-explain{padding:12px 20px 16px;position:relative;z-index:1}
+.card-explain-divider{width:32px;height:1px;background:linear-gradient(90deg,transparent,rgba(200,169,110,.4),transparent);margin:0 auto 10px}
+.card-explain-title{font-family:'Noto Serif SC',serif;font-size:11px;color:var(--accent);letter-spacing:2px;text-align:center;margin-bottom:6px}
+.card-explain-text{font-family:'Noto Serif SC',serif;font-size:12px;color:#6B5D4F;line-height:1.8;text-align:justify;letter-spacing:.5px}
+
+/* Seal */
+.card-seal{position:absolute;bottom:14px;right:18px;width:30px;height:30px;background:#C04851;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Ma Shan Zheng',cursive;font-size:15px;color:#fff;opacity:.65;z-index:3;transform:rotate(-5deg)}
+
+/* CONTROLS */
+.controls-panel{width:360px;min-width:360px;border-left:1px solid var(--border);background:var(--white);overflow-y:auto;display:flex;flex-direction:column}
+.controls-panel::-webkit-scrollbar{width:4px}
+.controls-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.control-section{padding:14px 20px;border-bottom:1px solid #F0EBE3}
+.control-section:last-child{border-bottom:none}
+.control-label{font-size:12px;color:var(--text-dim);margin-bottom:10px;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+
+/* Theme grid */
+.theme-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.theme-btn{padding:8px 4px;border:2px solid transparent;border-radius:8px;cursor:pointer;text-align:center;transition:all .2s;background:none;font-family:'Noto Serif SC',serif}
+.theme-btn .theme-preview{width:100%;height:24px;border-radius:4px;margin-bottom:4px}
+.theme-btn .theme-name{font-size:11px;color:var(--text-dim)}
+.theme-btn.active{border-color:var(--accent);background:rgba(192,72,81,.05)}
+.theme-btn:hover{background:rgba(0,0,0,.03)}
+.theme-btn[data-theme="spring"] .theme-preview{background:linear-gradient(135deg,#FFF5E6,#E8F5E9)}
+.theme-btn[data-theme="summer"] .theme-preview{background:linear-gradient(135deg,#F0F8FF,#E0F7FA)}
+.theme-btn[data-theme="autumn"] .theme-preview{background:linear-gradient(135deg,#FFF8F0,#FFF3E0)}
+.theme-btn[data-theme="winter"] .theme-preview{background:linear-gradient(135deg,#F5F5FA,#E8EAF6)}
+.theme-btn[data-theme="classic"] .theme-preview{background:linear-gradient(135deg,#F5F0E8,#EFEBE9)}
+
+.model-select{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Noto Serif SC',serif;font-size:13px;color:var(--text);background:var(--white);outline:none;cursor:pointer}
+.api-key-group{display:flex;gap:6px}
+.api-key-input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace;outline:none;color:var(--text)}
+.api-key-input:focus{border-color:var(--accent)}
+.api-key-save{padding:8px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Noto Serif SC',serif;transition:all .2s}
+.api-key-save:hover{background:#A83A47}
+
+/* Prompt editor */
+.prompt-line-ta{width:100%;min-height:120px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:'Noto Serif SC',serif;line-height:1.5;resize:vertical;outline:none;color:var(--text)}
+.prompt-line-ta:focus{border-color:var(--accent)}
+.prompt-actions{display:flex;gap:6px;margin-top:8px}
+
+/* Buttons */
+.btn{padding:8px 16px;border:none;border-radius:8px;font-family:'Noto Serif SC',serif;font-size:13px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#A83A47;transform:translateY(-1px)}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed;transform:none}
+.btn-secondary{background:rgba(200,169,110,.15);color:var(--text-dim);border:1px solid var(--border)}
+.btn-secondary:hover{background:rgba(200,169,110,.25)}
+.btn-gold{background:linear-gradient(135deg,var(--accent-gold),#D4B87A);color:#fff}
+.btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(200,169,110,.3)}
+.btn-full{width:100%;justify-content:center}
+
+/* Per-line generation progress */
+.gen-lines{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+.gen-line-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12px;background:#FAFAF5;border:1px solid #EDE5D5}
+.gen-line-item .gen-line-icon{font-size:14px;width:18px;text-align:center}
+.gen-line-item .gen-line-label{flex:1;color:var(--text-dim)}
+.gen-line-item.done{border-color:rgba(91,140,90,.3);background:#F0F7EF}
+.gen-line-item.done .gen-line-label{color:var(--accent-green)}
+.gen-line-item.active{border-color:rgba(200,169,110,.4);background:#FFF9F0}
+.gen-line-item.fail{border-color:rgba(192,72,81,.3);background:#FFF5F5}
+.gen-line-item.fail .gen-line-label{color:var(--accent)}
+
+/* Modal / Toast / Spinner / Empty state */
+.modal-overlay{position:fixed;inset:0;background:rgba(45,36,24,.5);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--white);border-radius:16px;padding:28px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h3{font-family:'Ma Shan Zheng',cursive;font-size:22px;color:var(--text);margin-bottom:20px}
+.modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-dim)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);padding:12px 24px;background:var(--sidebar-bg);color:var(--accent-gold);border-radius:10px;font-size:14px;z-index:200;transition:transform .3s ease;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.empty-state{text-align:center;color:var(--text-dim);padding:60px 20px}
+.empty-state-icon{font-size:48px;margin-bottom:16px;opacity:.3}
+.empty-state-text{font-size:16px;font-family:'ZCOOL XiaoWei',serif}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1200px){.controls-panel{width:320px;min-width:320px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">诗</div>
+        <h1>古诗词卡片</h1>
+      </div>
+      <input type="text" class="sidebar-search" id="searchInput" placeholder="搜索诗名、作者、内容...">
+    </div>
+    <div class="grade-filter" id="gradeFilter">
+      <button class="grade-btn active" data-grade="all">全部</button>
+      <button class="grade-btn" data-grade="1">一年级</button>
+      <button class="grade-btn" data-grade="2">二年级</button>
+      <button class="grade-btn" data-grade="3">三年级</button>
+      <button class="grade-btn" data-grade="4">四年级</button>
+      <button class="grade-btn" data-grade="5">五年级</button>
+      <button class="grade-btn" data-grade="6">六年级</button>
+    </div>
+    <nav class="poem-list" id="poemList"></nav>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbarTitle">请从左侧选择一首古诗</span>
+      <button class="btn-icon" id="settingsBtn" title="设置">⚙</button>
+    </div>
+    <div class="content">
+      <div class="preview-area" id="previewArea">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-state-icon">📜</div>
+          <div class="empty-state-text">选择一首古诗，开始生成精美卡片</div>
+        </div>
+        <div class="card-wrapper" id="cardWrapper" style="display:none">
+          <div class="card theme-spring" id="card">
+            <div class="card-border"></div>
+            <div class="card-content" id="cardContent">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="card-seal" id="cardSeal">诗</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="control-section">
+          <div class="control-label">🎨 卡片主题</div>
+          <div class="theme-grid" id="themeGrid">
+            <button class="theme-btn active" data-theme="spring"><div class="theme-preview"></div><div class="theme-name">春</div></button>
+            <button class="theme-btn" data-theme="summer"><div class="theme-preview"></div><div class="theme-name">夏</div></button>
+            <button class="theme-btn" data-theme="autumn"><div class="theme-preview"></div><div class="theme-name">秋</div></button>
+            <button class="theme-btn" data-theme="winter"><div class="theme-preview"></div><div class="theme-name">冬</div></button>
+            <button class="theme-btn" data-theme="classic"><div class="theme-preview"></div><div class="theme-name">古典</div></button>
+          </div>
+        </div>
+        <div class="control-section">
+          <div class="control-label">🤖 AI 绘图模型</div>
+          <select class="model-select" id="modelSelect">
+            <option value="gpt-image-2-text-to-image">GPT Image 2（推荐·画质更好）</option>
+            <option value="nano-banana-pro">Nano Banana Pro（支持参考图）</option>
+          </select>
+        </div>
+        <div class="control-section">
+          <div class="control-label">🔑 API Key <span style="font-size:10px;color:#aaa;margin-left:4px">kie.ai</span></div>
+          <div class="api-key-group">
+            <input type="password" class="api-key-input" id="apiKeyInput" placeholder="输入你的 API Key...">
+            <button class="api-key-save" id="apiKeySave">保存</button>
+          </div>
+        </div>
+        <div class="control-section">
+          <div class="control-label">✏️ 插画提示词（可编辑）</div>
+          <textarea class="prompt-line-ta" id="poemPromptTa" style="min-height:120px" placeholder="选择古诗后自动生成插画提示词..."></textarea>
+          <div class="prompt-actions">
+            <button class="btn btn-secondary" id="copyPromptBtn">复制提示词</button>
+            <button class="btn btn-secondary" id="regenPromptBtn">重新生成</button>
+          </div>
+        </div>
+        <div class="control-section">
+          <button class="btn btn-primary btn-full" id="generateBtn" disabled>✨ 生成插画</button>
+          <div class="gen-lines" id="genLines"></div>
+        </div>
+        <div class="control-section">
+          <button class="btn btn-gold btn-full" id="exportBtn" disabled>📥 导出卡片 PNG</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h3>⚙️ 设置</h3>
+    <div class="control-section" style="border:none;padding:0 0 16px">
+      <div class="control-label">API Key</div>
+      <div class="api-key-group">
+        <input type="password" class="api-key-input" id="modalApiKey" placeholder="kie.ai API Key...">
+        <button class="api-key-save" id="modalApiKeySave">保存</button>
+      </div>
+      <p style="font-size:11px;color:#aaa;margin-top:8px">密钥保存在浏览器本地，不会上传</p>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== POEM DATA =====================
+const RAW_POEMS = [
+  ["1a","咏鹅","唐·骆宾王","鹅，鹅，鹅，曲项向天歌。","白毛浮绿水，红掌拨清波。"],
+  ["1a","江南","汉乐府","江南可采莲，莲叶何田田。","鱼戏莲叶间。","鱼戏莲叶东，鱼戏莲叶西，","鱼戏莲叶南，鱼戏莲叶北。"],
+  ["1a","画","佚名","远看山有色，近听水无声。","春去花还在，人来鸟不惊。"],
+  ["1a","悯农（其二）","唐·李绅","锄禾日当午，汗滴禾下土。","谁知盘中餐，粒粒皆辛苦。"],
+  ["1a","古朗月行（节选）","唐·李白","小时不识月，呼作白玉盘。","又疑瑶台镜，飞在青云端。"],
+  ["1a","风","唐·李峤","解落三秋叶，能开二月花。","过江千尺浪，入竹万竿斜。"],
+  ["1b","春晓","唐·孟浩然","春眠不觉晓，处处闻啼鸟。","夜来风雨声，花落知多少。"],
+  ["1b","赠汪伦","唐·李白","李白乘舟将欲行，忽闻岸上踏歌声。","桃花潭水深千尺，不及汪伦送我情。"],
+  ["1b","静夜思","唐·李白","床前明月光，疑是地上霜。","举头望明月，低头思故乡。"],
+  ["1b","寻隐者不遇","唐·贾岛","松下问童子，言师采药去。","只在此山中，云深不知处。"],
+  ["1b","池上","唐·白居易","小娃撑小艇，偷采白莲回。","不解藏踪迹，浮萍一道开。"],
+  ["1b","小池","宋·杨万里","泉眼无声惜细流，树阴照水爱晴柔。","小荷才露尖尖角，早有蜻蜓立上头。"],
+  ["2a","梅花","宋·王安石","墙角数枝梅，凌寒独自开。","遥知不是雪，为有暗香来。"],
+  ["2a","小儿垂钓","唐·胡令能","蓬头稚子学垂纶，侧坐莓苔草映身。","路人借问遥招手，怕得鱼惊不应人。"],
+  ["2a","登鹳雀楼","唐·王之涣","白日依山尽，黄河入海流。","欲穷千里目，更上一层楼。"],
+  ["2a","望庐山瀑布","唐·李白","日照香炉生紫烟，遥看瀑布挂前川。","飞流直下三千尺，疑是银河落九天。"],
+  ["2a","江雪","唐·柳宗元","千山鸟飞绝，万径人踪灭。","孤舟蓑笠翁，独钓寒江雪。"],
+  ["2a","夜宿山寺","唐·李白","危楼高百尺，手可摘星辰。","不敢高声语，恐惊天上人。"],
+  ["2a","敕勒歌","北朝民歌","敕勒川，阴山下。","天似穹庐，笼盖四野。","天苍苍，野茫茫，风吹草低见牛羊。"],
+  ["2b","村居","清·高鼎","草长莺飞二月天，拂堤杨柳醉春烟。","儿童散学归来早，忙趁东风放纸鸢。"],
+  ["2b","咏柳","唐·贺知章","碧玉妆成一树高，万条垂下绿丝绦。","不知细叶谁裁出，二月春风似剪刀。"],
+  ["2b","赋得古原草送别（节选）","唐·白居易","离离原上草，一岁一枯荣。","野火烧不尽，春风吹又生。"],
+  ["2b","晓出净慈寺送林子方","宋·杨万里","毕竟西湖六月中，风光不与四时同。","接天莲叶无穷碧，映日荷花别样红。"],
+  ["2b","绝句（两个黄鹂鸣翠柳）","唐·杜甫","两个黄鹂鸣翠柳，一行白鹭上青天。","窗含西岭千秋雪，门泊东吴万里船。"],
+  ["2b","悯农（其一）","唐·李绅","春种一粒粟，秋收万颗子。","四海无闲田，农夫犹饿死。"],
+  ["2b","舟夜书所见","清·查慎行","月黑见渔灯，孤光一点萤。","微微风簇浪，散作满河星。"],
+  ["3a","山行","唐·杜牧","远上寒山石径斜，白云生处有人家。","停车坐爱枫林晚，霜叶红于二月花。"],
+  ["3a","赠刘景文","宋·苏轼","荷尽已无擎雨盖，菊残犹有傲霜枝。","一年好景君须记，最是橙黄橘绿时。"],
+  ["3a","夜书所见","宋·叶绍翁","萧萧梧叶送寒声，江上秋风动客情。","知有儿童挑促织，夜深篱落一灯明。"],
+  ["3a","望天门山","唐·李白","天门中断楚江开，碧水东流至此回。","两岸青山相对出，孤帆一片日边来。"],
+  ["3a","饮湖上初晴后雨","宋·苏轼","水光潋滟晴方好，山色空蒙雨亦奇。","欲把西湖比西子，淡妆浓抹总相宜。"],
+  ["3a","望洞庭","唐·刘禹锡","湖光秋月两相和，潭面无风镜未磨。","遥望洞庭山水翠，白银盘里一青螺。"],
+  ["3a","早发白帝城","唐·李白","朝辞白帝彩云间，千里江陵一日还。","两岸猿声啼不住，轻舟已过万重山。"],
+  ["3a","采莲曲","唐·王昌龄","荷叶罗裙一色裁，芙蓉向脸两边开。","乱入池中看不见，闻歌始觉有人来。"],
+  ["3b","绝句（迟日江山丽）","唐·杜甫","迟日江山丽，春风花草香。","泥融飞燕子，沙暖睡鸳鸯。"],
+  ["3b","惠崇春江晚景","宋·苏轼","竹外桃花三两枝，春江水暖鸭先知。","蒌蒿满地芦芽短，正是河豚欲上时。"],
+  ["3b","三衢道中","宋·曾几","梅子黄时日日晴，小溪泛尽却山行。","绿阴不减来时路，添得黄鹂四五声。"],
+  ["3b","忆江南","唐·白居易","江南好，风景旧曾谙。","日出江花红胜火，春来江水绿如蓝。","能不忆江南？"],
+  ["3b","元日","宋·王安石","爆竹声中一岁除，春风送暖入屠苏。","千门万户曈曈日，总把新桃换旧符。"],
+  ["3b","清明","唐·杜牧","清明时节雨纷纷，路上行人欲断魂。","借问酒家何处有？牧童遥指杏花村。"],
+  ["3b","九月九日忆山东兄弟","唐·王维","独在异乡为异客，每逢佳节倍思亲。","遥知兄弟登高处，遍插茱萸少一人。"],
+  ["3b","滁州西涧","唐·韦应物","独怜幽草涧边生，上有黄鹂深树鸣。","春潮带雨晚来急，野渡无人舟自横。"],
+  ["3b","大林寺桃花","唐·白居易","人间四月芳菲尽，山寺桃花始盛开。","长恨春归无觅处，不知转入此中来。"],
+  ["4a","暮江吟","唐·白居易","一道残阳铺水中，半江瑟瑟半江红。","可怜九月初三夜，露似真珠月似弓。"],
+  ["4a","题西林壁","宋·苏轼","横看成岭侧成峰，远近高低各不同。","不识庐山真面目，只缘身在此山中。"],
+  ["4a","雪梅","宋·卢钺","梅雪争春未肯降，骚人阁笔费评章。","梅须逊雪三分白，雪却输梅一段香。"],
+  ["4a","鹿柴","唐·王维","空山不见人，但闻人语响。","返景入深林，复照青苔上。"],
+  ["4a","嫦娥","唐·李商隐","云母屏风烛影深，长河渐落晓星沉。","嫦娥应悔偷灵药，碧海青天夜夜心。"],
+  ["4a","出塞","唐·王昌龄","秦时明月汉时关，万里长征人未还。","但使龙城飞将在，不教胡马度阴山。"],
+  ["4a","凉州词（葡萄美酒夜光杯）","唐·王翰","葡萄美酒夜光杯，欲饮琵琶马上催。","醉卧沙场君莫笑，古来征战几人回？"],
+  ["4a","夏日绝句","宋·李清照","生当作人杰，死亦为鬼雄。","至今思项羽，不肯过江东。"],
+  ["4a","别董大","唐·高适","千里黄云白日曛，北风吹雁雪纷纷。","莫愁前路无知己，天下谁人不识君？"],
+  ["4b","四时田园杂兴（其二十五）","宋·范成大","梅子金黄杏子肥，麦花雪白菜花稀。","日长篱落无人过，惟有蜻蜓蛱蝶飞。"],
+  ["4b","宿新市徐公店","宋·杨万里","篱落疏疏一径深，树头新绿未成阴。","儿童急走追黄蝶，飞入菜花无处寻。"],
+  ["4b","江畔独步寻花","唐·杜甫","黄师塔前江水东，春光懒困倚微风。","桃花一簇开无主，可爱深红爱浅红？"],
+  ["4b","蜂","唐·罗隐","不论平地与山尖，无限风光尽被占。","采得百花成蜜后，为谁辛苦为谁甜？"],
+  ["4b","独坐敬亭山","唐·李白","众鸟高飞尽，孤云独去闲。","相看两不厌，只有敬亭山。"],
+  ["4b","芙蓉楼送辛渐","唐·王昌龄","寒雨连江夜入吴，平明送客楚山孤。","洛阳亲友如相问，一片冰心在玉壶。"],
+  ["4b","塞下曲","唐·卢纶","月黑雁飞高，单于夜遁逃。","欲将轻骑逐，大雪满弓刀。"],
+  ["4b","墨梅","元·王冕","我家洗砚池头树，朵朵花开淡墨痕。","不要人夸好颜色，只留清气满乾坤。"],
+  ["5a","蝉","唐·虞世南","垂緌饮清露，流响出疏桐。","居高声自远，非是藉秋风。"],
+  ["5a","乞巧","唐·林杰","七夕今宵看碧霄，牵牛织女渡河桥。","家家乞巧望秋月，穿尽红丝几万条。"],
+  ["5a","示儿","宋·陆游","死去元知万事空，但悲不见九州同。","王师北定中原日，家祭无忘告乃翁。"],
+  ["5a","题临安邸","宋·林升","山外青山楼外楼，西湖歌舞几时休？","暖风熏得游人醉，直把杭州作汴州。"],
+  ["5a","己亥杂诗","清·龚自珍","九州生气恃风雷，万马齐喑究可哀。","我劝天公重抖擞，不拘一格降人材。"],
+  ["5a","山居秋暝","唐·王维","空山新雨后，天气晚来秋。","明月松间照，清泉石上流。","竹喧归浣女，莲动下渔舟。","随意春芳歇，王孙自可留。"],
+  ["5a","枫桥夜泊","唐·张继","月落乌啼霜满天，江枫渔火对愁眠。","姑苏城外寒山寺，夜半钟声到客船。"],
+  ["5a","渔歌子","唐·张志和","西塞山前白鹭飞，桃花流水鳜鱼肥。","青箬笠，绿蓑衣，斜风细雨不须归。"],
+  ["5a","观书有感·其一","宋·朱熹","半亩方塘一鉴开，天光云影共徘徊。","问渠那得清如许？为有源头活水来。"],
+  ["5a","观书有感·其二","宋·朱熹","昨夜江边春水生，蒙冲巨舰一毛轻。","向来枉费推移力，此日中流自在行。"],
+  ["5b","四时田园杂兴（其三十一）","宋·范成大","昼出耘田夜绩麻，村庄儿女各当家。","童孙未解供耕织，也傍桑阴学种瓜。"],
+  ["5b","稚子弄冰","宋·杨万里","稚子金盆脱晓冰，彩丝穿取当银钲。","敲成玉磬穿林响，忽作玻璃碎地声。"],
+  ["5b","村晚","宋·雷震","草满池塘水满陂，山衔落日浸寒漪。","牧童归去横牛背，短笛无腔信口吹。"],
+  ["5b","游子吟","唐·孟郊","慈母手中线，游子身上衣。","临行密密缝，意恐迟迟归。","谁言寸草心，报得三春晖。"],
+  ["5b","鸟鸣涧","唐·王维","人闲桂花落，夜静春山空。","月出惊山鸟，时鸣春涧中。"],
+  ["5b","凉州词（黄河远上白云间）","唐·王之涣","黄河远上白云间，一片孤城万仞山。","羌笛何须怨杨柳，春风不度玉门关。"],
+  ["5b","送元二使安西","唐·王维","渭城朝雨浥轻尘，客舍青青柳色新。","劝君更尽一杯酒，西出阳关无故人。"],
+  ["5b","秋夜将晓出篱门迎凉有感","宋·陆游","三万里河东入海，五千仞岳上摩天。","遗民泪尽胡尘里，南望王师又一年。"],
+  ["5b","从军行","唐·王昌龄","青海长云暗雪山，孤城遥望玉门关。","黄沙百战穿金甲，不破楼兰终不还。"],
+  ["5b","闻官军收河南河北","唐·杜甫","剑外忽传收蓟北，初闻涕泪满衣裳。","却看妻子愁何在，漫卷诗书喜欲狂。","白日放歌须纵酒，青春作伴好还乡。","即从巴峡穿巫峡，便下襄阳向洛阳。"],
+  ["6a","宿建德江","唐·孟浩然","移舟泊烟渚，日暮客愁新。","野旷天低树，江清月近人。"],
+  ["6a","六月二十七日望湖楼醉书","宋·苏轼","黑云翻墨未遮山，白雨跳珠乱入船。","卷地风来忽吹散，望湖楼下水如天。"],
+  ["6a","浪淘沙·其一","唐·刘禹锡","九曲黄河万里沙，浪淘风簸自天涯。","如今直上银河去，同到牵牛织女家。"],
+  ["6a","江南春","唐·杜牧","千里莺啼绿映红，水村山郭酒旗风。","南朝四百八十寺，多少楼台烟雨中。"],
+  ["6a","书湖阴先生壁","宋·王安石","茅檐长扫净无苔，花木成畦手自栽。","一水护田将绿绕，两山排闼送青来。"],
+  ["6a","回乡偶书","唐·贺知章","少小离家老大回，乡音无改鬓毛衰。","儿童相见不相识，笑问客从何处来。"],
+  ["6a","过故人庄","唐·孟浩然","故人具鸡黍，邀我至田家。","绿树村边合，青山郭外斜。","开轩面场圃，把酒话桑麻。","待到重阳日，还来就菊花。"],
+  ["6a","春夜喜雨","唐·杜甫","好雨知时节，当春乃发生。","随风潜入夜，润物细无声。","野径云俱黑，江船火独明。","晓看红湿处，花重锦官城。"],
+  ["6b","寒食","唐·韩翃","春城无处不飞花，寒食东风御柳斜。","日暮汉宫传蜡烛，轻烟散入五侯家。"],
+  ["6b","迢迢牵牛星","古诗十九首","迢迢牵牛星，皎皎河汉女。","纤纤擢素手，札札弄机杼。","终日不成章，泣涕零如雨。","河汉清且浅，相去复几许。","盈盈一水间，脉脉不得语。"],
+  ["6b","十五夜望月","唐·王建","中庭地白树栖鸦，冷露无声湿桂花。","今夜月明人尽望，不知秋思落谁家。"],
+  ["6b","长歌行","汉乐府","青青园中葵，朝露待日晞。","阳春布德泽，万物生光辉。","常恐秋节至，焜黄华叶衰。","百川东到海，何时复西归？","少壮不努力，老大徒伤悲！"],
+  ["6b","马诗","唐·李贺","大漠沙如雪，燕山月似钩。","何当金络脑，快走踏清秋。"],
+  ["6b","石灰吟","明·于谦","千锤万凿出深山，烈火焚烧若等闲。","粉骨碎身浑不怕，要留清白在人间。"],
+  ["6b","竹石","清·郑燮","咬定青山不放松，立根原在破岩中。","千磨万击还坚劲，任尔东西南北风。"],
+  ["6b","江上渔者","宋·范仲淹","江上往来人，但爱鲈鱼美。","君看一叶舟，出没风波里。"],
+  ["6b","泊船瓜洲","宋·王安石","京口瓜洲一水间，钟山只隔数重山。","春风又绿江南岸，明月何时照我还。"],
+  ["6b","游园不值","宋·叶绍翁","应怜屐齿印苍苔，小扣柴扉久不开。","春色满园关不住，一枝红杏出墙来。"],
+  ["6b","卜算子·送鲍浩然之浙东","宋·王观","水是眼波横，山是眉峰聚。","欲问行人去那边？眉眼盈盈处。","才始送春归，又送君归去。","若到江南赶上春，千万和春住。"],
+  ["6b","浣溪沙·游蕲水清泉寺","宋·苏轼","山下兰芽短浸溪，松间沙路净无泥。","萧萧暮雨子规啼。","谁道人生无再少？门前流水尚能西！","休将白发唱黄鸡。"],
+  ["6b","清平乐·春归何处","宋·黄庭坚","春归何处？寂寞无行路。","若有人知春去处，唤取归来同住。","春无踪迹谁知？除非问取黄鹂。","百啭无人能解，因风飞过蔷薇。"]
+];
+
+const GRADE_MAP={"1a":{grade:"一年级",semester:"上册"},"1b":{grade:"一年级",semester:"下册"},"2a":{grade:"二年级",semester:"上册"},"2b":{grade:"二年级",semester:"下册"},"3a":{grade:"三年级",semester:"上册"},"3b":{grade:"三年级",semester:"下册"},"4a":{grade:"四年级",semester:"上册"},"4b":{grade:"四年级",semester:"下册"},"5a":{grade:"五年级",semester:"上册"},"5b":{grade:"五年级",semester:"下册"},"6a":{grade:"六年级",semester:"上册"},"6b":{grade:"六年级",semester:"下册"}};
+
+// Split couplet lines into individual sentences (句), preserving punctuation
+function splitToSentences(rawLines){
+  const result=[];
+  rawLines.forEach(line=>{
+    const trimmed=line.trim();
+    if(!trimmed)return;
+    // Extract ending punctuation
+    const endPunc=trimmed.match(/[。！？；！]+$/)?.[0]||'';
+    const stripped=trimmed.replace(/[。！？；！]+$/,'').trim();
+    if(!stripped)return;
+    const parts=stripped.split('，').filter(s=>s.trim());
+    if(parts.length<=1){result.push(stripped+endPunc);return}
+    // Merge consecutive identical short parts (e.g. 鹅，鹅，鹅 → 鹅，鹅，鹅)
+    const merged=[];
+    let i=0;
+    while(i<parts.length){
+      let cur=parts[i];const base=parts[i];
+      while(i+1<parts.length&&parts[i+1]===base&&base.length<=3){i++;cur+='，'+parts[i]}
+      merged.push(cur);i++;
+    }
+    // Add punctuation back: ， between sentences, original ending on last
+    merged.forEach((m,idx)=>{
+      if(idx<merged.length-1) result.push(m+'，');
+      else result.push(m+endPunc);
+    });
+  });
+  return result;
+}
+
+const poems=RAW_POEMS.map((raw,i)=>{const gs=GRADE_MAP[raw[0]];const a=raw[2];let d='',au=a;if(a.includes('·')){const p=a.split('·');d=p[0];au=p[1]}return{id:i,gradeKey:raw[0],gradeNum:parseInt(raw[0]),grade:gs.grade,semester:gs.semester,title:raw[1],dynasty:d,author:au,authorDisplay:d?`[${d}] ${au}`:au,lines:raw.slice(3),sentences:splitToSentences(raw.slice(3)),fullText:raw.slice(3).join('')}});
+
+// ===================== POEM EXPLANATIONS =====================
+const POEM_EXPLAIN={
+"咏鹅":"这首诗描写了白鹅在水面上游动的情景。小诗人骆宾王七岁时看到池塘里的白鹅，写下这首诗。前半部分写鹅的叫声和样子，后半部分写白鹅浮在水面上，红色的脚掌拨动清澈的水波，色彩鲜明，画面生动可爱。",
+"江南":"这是一首采莲歌，描写了江南水乡人们采莲时的欢乐场景。莲叶茂盛碧绿，鱼儿在莲叶间自由自在地嬉戏，东西南北到处游，充满了生活的气息和水乡的美景。",
+"画":"这首诗描写的是一幅画。远看山有颜色，近听水却没有声音；春天过去了花还在开，人来了鸟却不害怕。每一句都是对比，告诉我们画中景物和真实自然的不同。",
+"悯农（其二）":"这首诗告诉我们粮食来之不易。农民在正午烈日下锄地，汗水一滴一滴落在土里。谁知道我们碗里的饭，每一粒都是农民辛苦劳动换来的呢？提醒我们要珍惜粮食。",
+"古朗月行（节选）":"小时候不认识月亮，把它叫做白玉做的大盘子。又觉得它像仙境里的镜子，飞挂在蓝天上的云彩旁边。诗人用儿童的口吻，写出了月亮又圆又亮的样子。",
+"风":"这首诗描写风的力量和作用：它能吹落秋天的树叶，也能催开春天的花朵；能掀起江面上的巨浪，也能吹弯竹林里的竹子。全诗没有出现一个「风」字，却处处写出了风的样子。",
+"春晓":"春天睡醒不知不觉天已经亮了，到处都能听到鸟儿啼叫。夜里听到风雨的声音，不知道花朵被吹落了多少。诗中既有春天的美好，也有对花落的惋惜之情。",
+"赠汪伦":"李白乘船正要出发，忽然听到岸上有人踏歌送行。桃花潭的水虽然深千尺，也比不上汪伦对我的友情深。这首诗用夸张的手法表达了朋友之间的深厚情谊。",
+"静夜思":"月光照在床前，像是地上铺了一层白霜。抬头望天上的明月，低下头就思念起远方的故乡。这是最著名的思乡诗，写出了游子在寂静夜晚对家乡的深深思念。",
+"寻隐者不遇":"在松树下问童子，童子说师傅去采药了。他就在这座山里，但是云雾弥漫，不知道在哪里。诗中虽然没有见到隐者，却通过童子的回答，写出了隐者生活的高洁和山中的幽静。",
+"池上":"一个小孩子撑着小船偷偷去采白莲，回来的时候不懂得隐藏踪迹，浮萍被小船划开了一道长长的痕迹。诗中把小孩子天真调皮的样子写得非常生动有趣。",
+"小池":"泉眼悄悄地让细流流淌，树荫倒映在水面上，好像也很喜欢这柔和的阳光。小小的荷叶刚刚露出尖尖的角，就已经有蜻蜓停在上面了。这首诗描写初夏池塘的清新美景。",
+"梅花":"墙角有几枝梅花，在寒冷中独自盛开。远看以为那是雪，但因为闻到了淡淡的花香，才知道不是雪而是梅花。诗人赞美了梅花不怕寒冷、高洁坚强的品质。",
+"小儿垂钓":"一个头发蓬乱的小孩子坐在河边学钓鱼，侧身坐在长满青苔的地上，身子被草丛遮住。有路人来问路，他远远地摆摆手不回答，怕把鱼吓跑了。把孩子认真钓鱼的可爱样子写得栩栩如生。",
+"登鹳雀楼":"太阳沿着山慢慢落下去了，黄河水滚滚流向大海。想要看到更远的风景，就要再登上更高的一层楼。这首诗告诉我们要站得高才能看得远，要不断进取。",
+"望庐山瀑布":"太阳照射香炉峰生出紫色的烟雾，远远望去瀑布像白练挂在山前。瀑布飞流直下有三千尺那么高，让人怀疑是天上的银河落到了人间。诗人用夸张的手法写出了瀑布的壮观。",
+"江雪":"所有的山上都看不到飞鸟，所有的路上都没有行人。只有一条小船上，一个穿蓑衣戴斗笠的老翁，独自在寒冷的江面上钓鱼。这首诗写出了极度安静孤独的冬日景象。",
+"夜宿山寺":"山上寺院的高楼有一百尺那么高，站在上面伸手就能摘到星星。不敢大声说话，怕惊动了天上的神仙。诗人用夸张的想象，写出了楼的高和夜的美。",
+"敕勒歌":"敕勒川在阴山脚下，天空像圆圆的帐篷笼罩着大地。天空蓝蓝的，原野辽阔无边，风吹过草低下去时，露出了成群的牛羊。这首北朝民歌描绘了草原的壮美风光。",
+"村居":"二月里草长莺飞，杨柳轻轻拂着堤岸，好像沉醉在春天的烟雾里。孩子们放学回来得很早，赶紧趁着东风放起了风筝。描绘了一幅快乐的乡村春日图景。",
+"咏柳":"高高的柳树像用碧玉装扮而成，千万条柳枝像绿色的丝带垂下来。不知道这细密的柳叶是谁裁出来的？原来是二月的春风像剪刀一样剪出来的。诗人把春风比作剪刀，想象非常巧妙。",
+"赋得古原草送别（节选）":"原野上的草长得很茂盛，每年枯萎又每年繁荣。野火无论怎样焚烧都烧不完，春风一吹它又重新生长出来。诗中赞美了小草顽强不息的生命力。",
+"晓出净慈寺送林子方":"到底是六月里的西湖，风光和其他季节大不一样。碧绿的莲叶一直铺到天边，阳光下荷花红得格外鲜艳。写出了西湖六月荷花盛开的壮美景象。",
+"绝句（两个黄鹂鸣翠柳）":"两只黄鹂在翠绿的柳枝上鸣叫，一行白鹭飞向蓝天。窗户里可以看到西岭终年不化的积雪，门前停泊着从东吴万里而来的船只。诗中画面层次分明，色彩丰富。",
+"悯农（其一）":"春天播下一粒种子，秋天可以收获万颗粮食。天下没有一块荒废的土地，可是农夫还是有饿死的。诗人揭示了当时社会的不公平现象，表达了对农民的深切同情。",
+"舟夜书所见":"漆黑的夜晚只见一盏渔灯，那孤零零的灯光像一只萤火虫。微风吹来聚起细细的波浪，灯光的倒影散开来，好像满河都是星星。写出了夜晚河面上灯光映照的美丽景象。",
+"山行":"沿着弯曲的山路登上深秋的山，白云飘浮的地方有人家居住。停下车来是因为喜爱这深秋枫林的美景，经过霜打的枫叶比二月的春花还要红艳。",
+"赠刘景文":"荷花已经凋谢，菊花虽然残落却还有傲然挺立的枝条。一年中最好的景色你要记住，那就是橙子金黄、橘子青绿的时候。诗人鼓励朋友要看到秋天也有它独特的美。",
+"夜书所见":"梧桐树叶被秋风吹得沙沙响，送来阵阵寒意，江上的秋风让旅人更加思念家乡。知道有小孩在捉蟋蟀，深夜里篱笆旁还有一盏灯亮着。写出了秋夜的思乡之情。",
+"望天门山":"天门山被长江从中断开，碧绿的江水向东流去在这里回旋。两岸的青山相对着出现，一只小船从太阳那边驶来。写出了天门山的雄伟和长江的壮观。",
+"饮湖上初晴后雨":"晴天时西湖水波荡漾非常美丽，雨天时山色朦胧也很奇妙。如果把西湖比作美女西施，不管是淡妆还是浓抹都非常合适。诗人把西湖比作西施，赞美了西湖的美丽。",
+"望洞庭":"湖光和秋月相互辉映，湖面风平浪静像一面没有打磨的铜镜。远看洞庭湖中的君山，就像白银盘里放着一颗青色的螺。写出了洞庭湖秋天月夜的宁静美丽。",
+"早发白帝城":"早晨告别了彩云间的白帝城，千里之外的江陵一天就可以到达。两岸的猿猴叫声不断，轻快的小船已经穿过万重高山。写出了顺水行舟的轻快和壮丽的三峡风光。",
+"采莲曲":"采莲姑娘的裙子与荷叶的颜色一样，荷花向两边开放，仿佛朝着姑娘的脸庞。姑娘们混入荷塘中看不见了，听到歌声才知道有人来了。描写了采莲姑娘与荷塘美景融为一体的画面。",
+"清明":"清明节这天细雨纷纷，路上的行人看起来十分忧愁。问一声哪里有酒家？牧童远远地指着杏花深处的村庄。写出了清明时节特有的凄迷氛围和行人的惆怅心情。",
+"九月九日忆山东兄弟":"一个人独自在异乡做客，每到过节的时候就更加思念亲人。想到兄弟们今天一定在登高望远，插遍茱萸的时候发现少了一个人。这首诗表达了游子在佳节时对家人深深的思念。",
+"忆江南":"江南的风景多么美好，那里的风光我曾经很熟悉。太阳出来时江边的花朵红得胜过火焰，春天来了江水绿得像蓝草一样。怎能不让人怀念江南呢？",
+"元日":"在爆竹声中旧的一年过去了，春风送来了温暖，大家喝着屠苏酒。千家万户沐浴在明亮的阳光中，大家都用新桃符替换旧桃符。描写了新年热闹欢乐的景象。",
+"滁州西涧":"唯独喜爱涧边生长的幽草，上面有黄鹂鸟在茂密的树林中鸣叫。春天的潮水带着雨水傍晚来得急，荒野渡口没有人，只有小船横在水面上。写出了幽静的自然风景。",
+"大林寺桃花":"人间的四月里花朵都已经凋谢了，山寺里的桃花却刚刚盛开。常常遗憾春天回去了无处寻找，却不知道春天已经转到了这山里来。诗人发现了山中迟开的桃花，写出了意外的惊喜。",
+"绝句（迟日江山丽）":"春天阳光明媚，江山格外秀丽，春风吹来花草的香味。泥土融化了燕子飞来飞去忙着筑巢，沙滩暖和了鸳鸯成双成对地睡在上面。描绘了一幅明丽的春日画面。",
+"惠崇春江晚景":"竹林外两三枝桃花开放了，春天江水变暖鸭子最先知道。满地蒌蒿和短短的芦芽，正是河豚快要上市的时候。这是为僧人惠崇的画作所写的题画诗。",
+"三衢道中":"梅子黄的时候天天都是晴天，乘小船到了小溪的尽头又改走山路。回去的路上绿荫一点也没减少，还多了几声黄鹂的歌唱。写出了初夏旅行的愉快心情。",
+"鹿柴":"空旷的山中看不到人影，只听见人说话的回声。夕阳的余光穿过深林，又照在青苔上。诗中写出了山林的幽静和光影之美。",
+"出塞":"秦汉时期的明月和边关依然如故，万里长征的将士还没有回来。只要有像飞将军李广那样的将领在，就不会让胡人的骑兵越过阴山。诗人表达了对边防将士的关切和保卫国家的决心。",
+"嫦娥":"云母屏风后面的烛影暗淡，银河渐渐西移，晨星也快消失了。嫦娥想必后悔偷吃了仙药，现在只能面对碧海青天，夜夜感到孤独。诗人借嫦娥的故事写出了孤寂的心情。",
+"夏日绝句":"活着就要做杰出的人物，死了也要做英雄。至今人们还在思念项羽，因为他宁死也不肯渡江逃跑。诗人借赞美项羽来表达对南宋朝廷偏安江南的不满。",
+"别董大":"千里黄云遮天蔽日，北风吹着大雁，大雪纷纷扬扬。不要担心前方的路上没有知己，天下有谁不认识你呢？这是一首送别诗，但写得豪迈乐观，鼓励朋友充满信心。",
+"四时田园杂兴（其二十五）":"梅子金黄杏子肥大，麦花开得雪白，菜花稀疏。白天长了篱笆边没有人经过，只有蜻蜓和蝴蝶在飞来飞去。描绘了初夏时节江南田园的宁静景色。",
+"宿新市徐公店":"篱笆稀稀疏疏，一条小路通向远方，树上的新叶刚长出来还没有形成浓荫。小孩子快跑着追赶黄色的蝴蝶，蝴蝶飞入菜花丛中再也找不到了。写出了儿童嬉戏的天真可爱。",
+"江畔独步寻花":"黄师塔前的江水向东流去，春光让人感到慵懒困倦。一簇桃花开在那里没有人管，不知道是深红色的更可爱还是浅红色的更可爱？诗人沉醉在春天的花海中。",
+"蜂":"无论是在平地还是在山尖，无限美好的风光都被蜜蜂占了。它们采集百花酿成蜜后，到底是为了谁辛苦为了谁甜蜜呢？诗人借蜜蜂来赞美勤劳奉献的人。",
+"独坐敬亭山":"鸟儿们都已经飞走了，只有一朵孤云悠闲地飘去。我和敬亭山互相看着，怎么也看不够，只有敬亭山能理解我。写出了诗人超然孤独的心境。",
+"芙蓉楼送辛渐":"寒雨连着江水在夜里进入吴地，清晨送别友人，只剩下楚山的孤影。如果洛阳的亲友问起我，请告诉他们，我的心依然像玉壶里的冰一样纯洁。诗人表达了自己高洁清廉的品格。",
+"塞下曲":"漆黑的夜晚大雁高高飞过，敌军的首领趁着夜色逃跑了。正要率领骑兵去追击，大雪已经落满了弓和刀。描写了边塞将士守卫边疆的英勇场景。",
+"墨梅":"我家洗砚池边的这棵梅树，花朵开放时带着淡淡的墨色痕迹。它不需要别人夸赞颜色好看，只想留下清新的香气充满天地之间。诗人借梅花表达了自己不慕名利、高洁自守的品格。",
+"蝉":"蝉垂着触须吸饮着清澈的露水，声音从稀疏的梧桐树上传出来。站在高处声音自然传得远，并不是借助秋风的吹送。诗人借蝉来表达高洁的品格和自信的人生态度。",
+"乞巧":"七夕之夜人们仰望碧蓝的天空，牛郎和织女在鹊桥上相会。家家户户都在对着秋月乞巧，穿完了几万条红线。描写了七夕节人们乞巧的热闹场景。",
+"示儿":"本来就知道人死后万事皆空，只是悲伤看不到国家统一。当朝廷的军队收复中原的那一天，在家祭时别忘了把这个好消息告诉你的父亲。这是陆游的绝笔诗，表达了他至死不忘收复失地的爱国情怀。",
+"题临安邸":"山外有青山，楼外还有楼，西湖边上的歌舞什么时候才能停止？暖洋洋的风把游人们都吹醉了，他们简直把杭州当成了汴州。诗人讽刺南宋统治者不思收复失地，只顾在杭州享乐。",
+"己亥杂诗":"全中国需要依靠风雷般的变革来焕发生气，可是社会上万马齐喑的局面实在令人悲哀。我劝老天爷重新振作精神，不拘泥于某种规格来选拔和降生人才。诗人呼吁打破死气沉沉的局面，渴望新的人才出现。",
+"山居秋暝":"空旷的山中刚下过一场雨，傍晚时分天气清凉。明月的清光透过松林洒落，清泉在石头上潺潺流淌。竹林中传来笑语，是洗衣服的女子归来，莲叶摇动，是渔船顺流而下。任凭春天的芳草凋零吧，王孙公子自然可以留在这山林中。这是一首描绘秋天山林美景的五言律诗。",
+"枫桥夜泊":"月亮落下去了，乌鸦啼叫着，满天都是寒霜。对着江边枫树和渔火，满怀愁绪难以入眠。半夜里苏州城外寒山寺的钟声，悠悠地传到了我这客船上。写出了旅途中的孤独和忧愁。",
+"渔歌子":"西塞山前白鹭在飞翔，桃花飘落流水，鳜鱼正肥美。戴着青色的斗笠，披着绿色的蓑衣，在斜风细雨中垂钓，不想回家。描绘了一幅悠闲自在的江南春雨垂钓图。",
+"观书有感·其一":"半亩大的方形池塘像一面打开的镜子，天光和云影都在水面上闪耀浮动。要问池水怎么会这样清澈？因为有活水不断从源头流来。诗人借方塘来比喻读书学习，说明不断汲取新知识才能保持思想清新。",
+"观书有感·其二":"昨夜江边春水上涨了，巨大的战船在水里轻如鸿毛。以前花费很多力气也推不动它，现在却能在大江中央自由航行。诗人借这个比喻说明灵感来了创作就会很顺畅。",
+"四时田园杂兴（其三十一）":"白天到田里锄草，晚上在家里搓麻线，村里的男男女女各有各的活要做。小孩子虽然不懂种田织布，也在桑树底下学着种瓜呢。描写了农村繁忙的劳动场景和儿童的天真可爱。",
+"稚子弄冰":"小孩子早晨从金属盆里把冰取出来，用彩丝穿过当作银钲来敲。敲出的声音像玉磬一样穿过树林，忽然冰块掉在地上发出像玻璃破碎的声音。写出了儿童冬天玩冰的天真有趣。",
+"村晚":"水草长满了池塘，水也涨满了池岸，山衔着落日的倒影浸在寒冷的水波中。牧童横骑在牛背上回家，拿着短笛没有曲调地随意吹着。描绘了一幅悠闲的乡村傍晚画面。",
+"游子吟":"慈爱的母亲手中拿着针线，为即将远行的儿子缝制衣衫。临行前一针一线缝得密密实实，担心孩子迟迟不能回来。谁说小草的那点心意，能报答得了春天的阳光？诗人用小草和春光来比喻子女和母亲的恩情，感人至深。",
+"鸟鸣涧":"人在安静的时候能感受到桂花飘落，夜晚的春山格外寂静。月亮升起惊动了山中的鸟儿，偶尔在春天的山涧中鸣叫。写出了月夜山间的幽静之美。",
+"凉州词（黄河远上白云间）":"黄河好像从白云间奔流而来，玉门关孤零零地矗立在万仞高山中。何必用羌笛吹奏那哀怨的《折杨柳》曲呢？春风本来就吹不到玉门关。诗人写出了边塞的荒凉和征人的思乡之情。",
+"送元二使安西":"渭城早晨的雨打湿了轻尘，旅舍旁的柳树显得更加青翠。请你再喝一杯酒吧，出了阳关往西就没有老朋友了。这是一首著名的送别诗，表达了依依不舍的友情。",
+"秋夜将晓出篱门迎凉有感":"三万里黄河滚滚向东流入大海，五千仞高山直插云霄。沦陷区的百姓眼泪都哭干了，他们向南期盼着朝廷的军队又过了一年。诗人写出了沦陷区人民渴望收复失地的悲痛心情。",
+"从军行":"青海湖上空连绵不断的云遮暗了雪山，孤城远远地望着玉门关。黄沙中身经百战磨穿了金甲，不打败敌人绝不回来。写出了边塞将士誓死保卫国家的坚定决心。",
+"闻官军收河南河北":"忽然传来收复蓟北的消息，初听到时泪水沾满了衣裳。回头看妻子哪里还有愁容，胡乱卷起诗书高兴得快要发狂。白天放歌还要痛饮，趁着春光正好回乡。马上从巴峡穿过巫峡，就下襄阳向洛阳。这是杜甫最快乐的一首诗，写出了听到胜利消息后的狂喜。",
+"宿建德江":"把船停靠在烟雾迷蒙的小洲边，日暮时分旅人又添了新的愁绪。旷野无边无际，天比树还低，江水清澈，月亮好像离人很近。写出了旅途中的孤独和月夜江上的宁静。",
+"六月二十七日望湖楼醉书":"乌云像打翻的墨汁还没遮住山峦，白花花的雨点像珍珠一样乱蹦乱跳地落入船中。一阵大风忽然把云雨吹散，望湖楼下的水面像晴朗的天空一样平静。写出了夏天暴雨来得快去得也快的壮观景象。",
+"浪淘沙·其一":"九曲黄河裹挟着万里泥沙，波涛滚滚像是来自天涯。现在要逆流直上银河去，一起到牵牛织女的家里做客。诗人用豪迈的笔调写出了黄河的壮观气势。",
+"江南春":"千里江南黄莺鸣叫，绿树映着红花，水边的村庄和山城的酒旗在风中飘动。南朝修建的众多寺庙，还有多少楼台笼罩在蒙蒙烟雨中。写出了江南春天的美丽景色和历史的沧桑。",
+"书湖阴先生壁":"茅屋的屋檐经常打扫干净没有青苔，花木成行成畦都是主人亲手栽种的。一条小河环绕着绿色的农田，两座青山好像推开门把青翠送进来。描写了庭院的整洁优美和自然环境的美妙。",
+"回乡偶书":"年轻的时候离开家乡，老了才回来，家乡的口音没变但头发已经花白了。村里的孩子们看见我都不认识，笑着问客人是从哪里来的。写出了诗人离乡多年后回乡时的感慨。",
+"过故人庄":"老朋友准备了丰盛的饭菜，邀请我到他的农家做客。绿树环绕着村庄，青山在城外斜斜地延伸。打开窗户面对着打谷场和菜园，端起酒杯一边喝酒一边谈论农事。等到重阳节那天，我还要来这里赏菊花。描绘了农家田园生活的宁静美好和朋友间的深厚情谊。",
+"春夜喜雨":"好雨知道下雨的节气，正是在春天植物萌发生长的时候。它随着春风在夜里悄悄落下，轻轻地滋润万物。野外的小路和云都是黑漆漆的，只有江边船上的灯火格外明亮。等明天早晨看看被雨打湿的红花，锦官城里的花一定沉甸甸地开满了。诗人写出了春雨的及时和美丽。",
+"寒食":"春天的长安城里到处飘飞着花瓣，寒食节东风吹拂着御苑的柳枝。傍晚时分宫里开始分发新蜡烛，轻烟首先散入权贵人家。诗中暗含对当时社会不公的讽刺。",
+"迢迢牵牛星":"遥远的牵牛星，皎洁的织女星。织女伸出细长雪白的手，札札地穿引着织布机。一整天也织不成布，哭泣的眼泪像雨一样落下。银河的水又清又浅，两个星之间的距离又能有多远呢？只隔着一条清澈的银河，却只能含情脉脉地相望而不能说话。写出了牛郎织女隔河相望的哀愁。",
+"十五夜望月":"庭院里月光照在地上雪白，树上栖息着乌鸦，冷露无声地打湿了桂花。今夜人们都在望着明月，不知道秋天的思念会落在谁家。写出了中秋月夜的清冷和思念之情。",
+"长歌行":"园中的葵菜青青郁郁，叶片上的晨露等待阳光晒干。春天的阳光布下恩泽，万物都焕发出勃勃生机。常常担心秋天到来，花叶都会变得枯黄衰败。百川东流到大海，什么时候才能再向西流回来？年轻时不努力奋斗，老了就只能白白地悲伤了。诗中告诫我们要珍惜时光，趁年轻努力。",
+"马诗":"大漠上的沙子像雪一样白，燕山上的月亮像弯弯的钩子。什么时候才能给马戴上金笼头，在秋天的原野上飞驰？诗人借骏马表达了自己渴望建功立业的壮志。",
+"石灰吟":"经过千锤万凿才从深山中开采出来，烈火焚烧也像平常事一样。就算粉身碎骨也不害怕，要把清白的本色留在人间。诗人借石灰表达了自己不畏艰难、坚守高洁品格的决心。",
+"竹石":"竹子牢牢咬住青山一点也不放松，它的根扎在破裂的岩石缝中。千磨万击仍然坚韧挺拔，任凭你刮东西南北风。诗人借竹子赞美了不屈不挠、刚强正直的精神。",
+"江上渔者":"江上来来往往的人，只是喜爱鲈鱼的鲜美。你看那小小的一叶扁舟，在风浪中时隐时现。诗人提醒人们享受美味时不要忘了捕鱼人的辛苦和危险。",
+"泊船瓜洲":"京口和瓜洲之间只隔着一条江，钟山也只隔着几座山。春风又一次吹绿了江南岸，明月什么时候才能照着我回到故乡呢？写出了诗人对故乡的深切思念。",
+"游园不值":"大概是主人怕我踩坏了青苔，我轻轻地敲了很久的柴门也没人开。可是满园的春色是关不住的，一枝红色的杏花已经伸出墙外来。诗中蕴含着新生事物不可阻挡的哲理。",
+"卜算子·送鲍浩然之浙东":"水像眼波一样流转，山像眉毛一样聚拢。要问行人去哪里？去那山水美丽的地方。刚送走了春天，又要送你离开。如果你到江南赶上了春天，一定要和春天住在一起。",
+"浣溪沙·游蕲水清泉寺":"山脚下的兰芽短短地浸在溪水中，松林间的沙路干净没有泥土。傍晚下起了雨，杜鹃在啼叫。谁说人不能再回到年轻的时候？门前的流水还能向西流淌呢！不要因为白发苍苍就唱那感叹时光的黄鸡之歌。诗人以乐观的精神鼓励人们不要感叹岁月的流逝。",
+"清平乐·春归何处":"春天回到了哪里？找不到它走过的路。如果有人知道春天去了哪里，请把它叫回来和我们一起住。春天到底去了哪里谁也不知道？除非去问黄鹂鸟。可是黄鹂百般鸣叫也无人能懂，于是它乘风飞过了蔷薇花丛。诗人用拟人手法写出了对春天离去的惋惜和不舍。"
+};
+
+// ===================== THEME =====================
+const THEME_KW={spring:['春','花','柳','桃','燕','莺','绿','暖','东风','蝶','杏','梨','草','纸鸢','春烟','春晓'],summer:['荷','莲','蝉','蛙','蜻蜓','夏','梅子','稻','荫'],autumn:['秋','霜','枫','菊','梧桐','雁','桂','橙','橘','萧萧','暮','愁'],winter:['雪','梅','寒','冰','冬','白','冷','弓刀']};
+function detectTheme(p){const t=p.fullText+p.title;const s={};for(const[k,v]of Object.entries(THEME_KW))s[k]=v.filter(x=>t.includes(x)).length;const b=Object.entries(s).sort((a,b)=>b[1]-a[1])[0];return b[1]>0?b[0]:'classic'}
+const THEME_ATMO={spring:'spring atmosphere, cherry blossoms, fresh green, warm sunlight',summer:'summer atmosphere, lush green, bright sunshine, cool water',autumn:'autumn atmosphere, golden maple leaves, harvest moon, warm amber',winter:'winter atmosphere, snow-covered landscape, cold blue, serene',classic:'traditional Chinese landscape, misty mountains, classical elegance'};
+
+// ===================== IMAGERY =====================
+const IMG=[['鹅','white geese'],['水','water'],['月','bright moon'],['山','mountains'],['花','flowers'],['柳','willow trees'],['雪','snow'],['风','wind'],['雨','rain'],['鸟','birds'],['鱼','fish'],['莲','lotus'],['荷','lotus leaves'],['梅','plum blossoms'],['竹','bamboo'],['松','pine trees'],['枫','maple trees'],['菊','chrysanthemums'],['舟','small boat'],['船','boat'],['星','stars'],['云','clouds'],['河','river'],['湖','lake'],['泉','spring water'],['儿童','children playing'],['牧童','shepherd boy'],['农夫','farmer working'],['草','grass'],['树','trees'],['日','sun'],['天','sky'],['霜','frost'],['露','dew'],['桃花','peach blossoms'],['燕子','swallows'],['白鹭','egrets'],['雁','wild geese'],['蝶','butterflies'],['蜂','bees'],['马','horses'],['牛','ox'],['桥','bridge'],['楼','tower'],['寺','temple'],['村','village'],['田','farmland'],['渔','fishing'],['笛','flute'],['剑','sword'],['明月','bright moonlight'],['白云','white clouds'],['青山','green mountains'],['孤帆','lone sail'],['残阳','setting sun'],['彩云','colorful clouds'],['大漠','vast desert'],['黄河','Yellow River'],['红掌','red webbed feet'],['白毛','white feathers'],['清波','clear ripples'],['青苔','green moss'],['浮萍','duckweed'],['风筝','kite'],['杏花村','apricot blossom village'],['锄禾','hoeing crops'],['盘中餐','plate of rice'],['汗滴','sweat drops'],['白玉盘','white jade plate'],['瑶台镜','fairy mirror'],['寒江','cold river'],['蓑笠','straw cape'],['苍苍','vast open sky'],['纸鸢','paper kite'],['春烟','spring mist'],['垂纶','fishing line'],['促织','cricket'],['莲叶','lotus leaves'],['红杏','red apricot blossoms'],['柴扉','wooden gate'],['浣女','washing women'],['渔舟','fishing boat'],['灯火','lamp light'],['瑶琴','lute'],['弓刀','bow and sword'],['蜡烛','candlelight'],['羌笛','Qiang flute'],['浣溪','washing in stream'],['茱萸','dogwood'],['寒鸦','winter crows']];
+
+// ===================== SINGLE POEM PROMPT =====================
+function generatePoemPrompt(poem){
+  const theme=detectTheme(poem);
+  const atmo=THEME_ATMO[theme];
+  // Collect all imagery from all sentences
+  const allFound=[];
+  poem.sentences.forEach(sent=>{
+    for(const[cn,en]of IMG){
+      if(sent.includes(cn)&&!allFound.includes(en))allFound.push(en);
+    }
+  });
+  const sceneElements=allFound.slice(0,12).join(', ')||'a serene scene from classical Chinese poetry';
+  // Build sentence descriptions for visual composition
+  const sentDescs=poem.sentences.map((s,i)=>{
+    const found=[];
+    for(const[cn,en]of IMG){if(s.includes(cn)&&!found.includes(en))found.push(en)}
+    return `area ${i+1}: ${found.slice(0,4).join(', ')||'poetic scene'}`;
+  });
+  return`A children's picture book illustration for a classical Chinese poem card, vertical 3:4 composition. The illustration depicts a unified scene incorporating: ${sceneElements}. The scene is divided into sections from top to bottom: ${sentDescs.join('; ')}. ${atmo}. Watercolor painting style, soft warm pastel colors, whimsical and cute, peaceful mood, Studio Ghibli inspired, gentle lighting, simple clean background with subtle traditional Chinese landscape elements. The image should work as a background for overlaid Chinese calligraphy text. Portrait vertical composition, 3:4 aspect ratio.`;
+}
+
+// ===================== STATE =====================
+const state={
+  poem:null,theme:'spring',model:'gpt-image-2-text-to-image',
+  apiKey:localStorage.getItem('pc_apikey')||'',
+  // Single poem image: { poemId: url }
+  poemImages:JSON.parse(localStorage.getItem('pc_poem_imgs')||'{}'),
+  generating:false,
+  genTaskId:null
+};
+
+// ===================== DOM =====================
+const $=id=>document.getElementById(id);
+const cardEl=$('card'),cardContent=$('cardContent'),cardSeal=$('cardSeal');
+const cardWrapper=$('cardWrapper'),emptyState=$('emptyState');
+const poemListEl=$('poemList'),searchInput=$('searchInput'),gradeFilter=$('gradeFilter');
+const topbarTitle=$('topbarTitle'),themeGrid=$('themeGrid');
+const modelSelect=$('modelSelect'),apiKeyInput=$('apiKeyInput');
+const poemPromptTa=$('poemPromptTa'),genLines=$('genLines');
+const generateBtn=$('generateBtn'),exportBtn=$('exportBtn');
+const toastEl=$('toast');
+
+// ===================== INIT =====================
+function init(){
+  apiKeyInput.value=state.apiKey;
+  $('modalApiKey').value=state.apiKey;
+  renderPoemList();
+  bindEvents();
+}
+
+// ===================== POEM LIST =====================
+function renderPoemList(filter='all',search=''){
+  const filtered=poems.filter(p=>{
+    const gm=filter==='all'||p.gradeNum===parseInt(filter);
+    const sm=!search||p.title.includes(search)||p.author.includes(search)||p.fullText.includes(search)||p.dynasty.includes(search);
+    return gm&&sm;
+  });
+  const groups={};
+  filtered.forEach(p=>{const k=`${p.grade} · ${p.semester}`;if(!groups[k])groups[k]=[];groups[k].push(p)});
+  let html='';
+  for(const[gk,gp]of Object.entries(groups)){
+    html+=`<div class="semester-group"><div class="semester-header">${gk}</div>`;
+    gp.forEach(p=>{
+      const has=!!state.poemImages[p.id];
+      html+=`<div class="poem-item ${state.poem?.id===p.id?'active':''}" data-id="${p.id}">
+        <span class="poem-item-title">${p.title}</span>
+        <span class="poem-item-author">${p.dynasty?p.dynasty+'·':''}${p.author}</span>
+        ${has?'<span class="poem-item-generated"></span>':''}
+      </div>`;
+    });
+    html+='</div>';
+  }
+  poemListEl.innerHTML=html||'<div style="padding:20px;text-align:center;color:#8B7B65;font-size:13px">未找到匹配的古诗</div>';
+}
+
+function getGradeFilter(){const a=gradeFilter.querySelector('.grade-btn.active');return a?a.dataset.grade:'all'}
+
+// ===================== SELECT POEM =====================
+function selectPoem(poem){
+  state.poem=poem;
+  setTheme(detectTheme(poem));
+  renderCard();
+  renderPrompt();
+  topbarTitle.textContent=`${poem.grade}${poem.semester} · ${poem.title}`;
+  generateBtn.disabled=!state.apiKey;
+  exportBtn.disabled=false;
+  // Smooth transition
+  cardWrapper.classList.add('switching');
+  emptyState.style.display='none';
+  cardWrapper.style.display='block';
+  setTimeout(()=>{
+    genLines.innerHTML='';
+  },50);
+  setTimeout(()=>{
+    cardWrapper.classList.remove('switching');
+  },80);
+  renderPoemList(getGradeFilter(),searchInput.value);
+}
+
+// ===================== RENDER CARD =====================
+function renderCard(){
+  const p=state.poem;if(!p)return;
+  const imgUrl=state.poemImages[p.id];
+  const hasImg=!!imgUrl;
+
+  // Themed decorative elements
+  const theme=detectTheme(p);
+  let decoHTML='';
+  if(theme==='spring'||theme==='summer'){
+    decoHTML+='<div class="card-deco-sun"></div>';
+  }
+  decoHTML+='<div class="card-deco-cloud">☁</div>';
+  if(p.fullText.includes('水')||p.fullText.includes('波')||p.fullText.includes('湖')||p.fullText.includes('河')||p.fullText.includes('江')||p.fullText.includes('池')||p.fullText.includes('莲')||p.fullText.includes('泉')){
+    decoHTML+='<div class="card-deco-wave"></div>';
+  }
+  if(p.fullText.includes('莲')||p.fullText.includes('荷')){
+    decoHTML+='<div class="card-deco-lotus">🪷</div>';
+  }
+
+  let html=`<div class="card-header">
+    <h2 class="card-title">${p.title}</h2>
+    <p class="card-author">${p.authorDisplay}</p>
+    <p class="card-grade">${p.grade} · ${p.semester}</p>
+    <div class="card-divider"></div>
+  </div>
+  <div class="card-body">
+    <div class="card-text-zone">`;
+
+  p.sentences.forEach(sent=>{
+    html+=`<p class="card-sentence">${sent}</p>`;
+  });
+
+  html+=`</div>
+    <div class="card-illustration-zone">`;
+
+  if(hasImg){
+    html+=`<div class="card-illustration" style="background-image:url('${imgUrl}')"></div>
+    <div class="card-deco-wave"></div>`;
+  }else{
+    html+=`<div class="card-illustration-ph" id="illustPlaceholder" title="点击上传插画">
+      <div class="ph-icon">🎨</div>
+      <div class="ph-text">点击上传或AI生成插画</div>
+    </div>`;
+  }
+  html+=decoHTML;
+  html+=`</div></div>`;
+
+  // Explanation at bottom
+  const explain=POEM_EXPLAIN[p.title];
+  if(explain){
+    html+=`<div class="card-explain">
+      <div class="card-explain-divider"></div>
+      <div class="card-explain-title">诗意赏析</div>
+      <p class="card-explain-text">${explain}</p>
+    </div>`;
+  }
+
+  cardContent.innerHTML=html;
+  cardSeal.textContent=p.author?p.author[0]:'诗';
+}
+
+function setPoemImage(url){
+  if(!state.poem)return;
+  state.poemImages[state.poem.id]=url;
+  // Only store remote URLs in localStorage (not base64 data URLs)
+  const toStore={};
+  for(const[k,v]of Object.entries(state.poemImages)){
+    if(v&&!v.startsWith('data:'))toStore[k]=v;
+  }
+  localStorage.setItem('pc_poem_imgs',JSON.stringify(toStore));
+  renderCard();
+  renderPoemList(getGradeFilter(),searchInput.value);
+}
+
+// ===================== PROMPT EDITOR =====================
+function renderPrompt(){
+  const p=state.poem;if(!p)return;
+  poemPromptTa.value=generatePoemPrompt(p);
+}
+
+// ===================== THEME =====================
+function setTheme(t){
+  state.theme=t;
+  cardEl.className=`card theme-${t}`;
+  themeGrid.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active',b.dataset.theme===t));
+}
+
+// ===================== GENERATE ILLUSTRATION =====================
+async function generateIllustration(){
+  if(!state.apiKey||!state.poem||state.generating)return;
+  state.generating=true;
+  generateBtn.disabled=true;
+  generateBtn.innerHTML='<span class="spinner"></span> 生成中...';
+
+  const p=state.poem;
+  const model=modelSelect.value;
+  const prompt=poemPromptTa.value;
+
+  // Progress
+  genLines.innerHTML=`<div class="gen-line-item active" id="gli-0">
+    <span class="gen-line-icon">🔄</span>
+    <span class="gen-line-label">正在创建生成任务...</span>
+  </div>`;
+
+  try{
+    const body={model,input:{prompt,aspect_ratio:'3:4',resolution:'1K'}};
+    if(model==='nano-banana-pro')body.input.output_format='png';
+
+    const resp=await fetch('https://api.kie.ai/api/v1/jobs/createTask',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${state.apiKey}`},
+      body:JSON.stringify(body)
+    });
+    const data=await resp.json();
+    if(data.code!==200)throw new Error(data.msg||'创建任务失败');
+
+    const taskId=data.data.taskId;
+    state.genTaskId=taskId;
+    const gli=document.getElementById('gli-0');
+
+    // Poll for result
+    await new Promise((resolve,reject)=>{
+      let attempts=0;
+      const timer=setInterval(async()=>{
+        attempts++;
+        if(attempts>60){
+          clearInterval(timer);
+          gli.className='gen-line-item fail';
+          gli.querySelector('.gen-line-icon').textContent='❌';
+          gli.querySelector('.gen-line-label').textContent='生成超时';
+          reject(new Error('超时'));
+          return;
+        }
+        try{
+          gli.querySelector('.gen-line-label').textContent=`生成中... (${attempts*5}s)`;
+          const r=await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`,{headers:{'Authorization':`Bearer ${state.apiKey}`}});
+          const d=await r.json();
+          if(d.data.state==='success'){
+            clearInterval(timer);
+            const result=JSON.parse(d.data.resultJson);
+            const url=result.resultUrls[0];
+            setPoemImage(url);
+            gli.className='gen-line-item done';
+            gli.querySelector('.gen-line-icon').textContent='✅';
+            gli.querySelector('.gen-line-label').textContent='插画生成完成！';
+            resolve();
+          }else if(d.data.state==='fail'){
+            clearInterval(timer);
+            gli.className='gen-line-item fail';
+            gli.querySelector('.gen-line-icon').textContent='❌';
+            gli.querySelector('.gen-line-label').textContent=d.data.failMsg||'生成失败';
+            reject(new Error(d.data.failMsg||'生成失败'));
+          }
+        }catch(e){/* retry on network error */}
+      },5000);
+    });
+    showToast('插画生成完成！');
+  }catch(err){
+    const gli=document.getElementById('gli-0');
+    if(gli){
+      gli.className='gen-line-item fail';
+      gli.querySelector('.gen-line-icon').textContent='❌';
+      gli.querySelector('.gen-line-label').textContent=err.message;
+    }
+    showToast('生成失败：'+err.message);
+  }
+
+  state.generating=false;
+  generateBtn.disabled=!state.apiKey;
+  generateBtn.innerHTML='✨ 生成插画';
+}
+
+// ===================== EXPORT =====================
+async function exportCard(){
+  if(!state.poem)return;
+  exportBtn.disabled=true;exportBtn.innerHTML='<span class="spinner"></span> 导出中...';
+  try{
+    const canvas=await html2canvas(cardEl,{scale:3,useCORS:true,allowTaint:false,backgroundColor:null});
+    const link=document.createElement('a');
+    link.download=`${state.poem.grade}${state.poem.semester}-${state.poem.title}.png`;
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    showToast('卡片已导出！');
+  }catch(err){showToast('导出失败：'+err.message)}
+  exportBtn.disabled=false;exportBtn.innerHTML='📥 导出卡片 PNG';
+}
+
+// ===================== TOAST =====================
+function showToast(msg){toastEl.textContent=msg;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),3000)}
+
+// ===================== EVENTS =====================
+function bindEvents(){
+  poemListEl.addEventListener('click',e=>{const item=e.target.closest('.poem-item');if(!item)return;selectPoem(poems[parseInt(item.dataset.id)])});
+  gradeFilter.addEventListener('click',e=>{const b=e.target.closest('.grade-btn');if(!b)return;gradeFilter.querySelectorAll('.grade-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderPoemList(b.dataset.grade,searchInput.value)});
+  searchInput.addEventListener('input',()=>renderPoemList(getGradeFilter(),searchInput.value));
+  themeGrid.addEventListener('click',e=>{const b=e.target.closest('.theme-btn');if(!b)return;setTheme(b.dataset.theme)});
+  modelSelect.addEventListener('change',()=>{state.model=modelSelect.value});
+
+  // API Key
+  $('apiKeySave').addEventListener('click',()=>{state.apiKey=apiKeyInput.value.trim();localStorage.setItem('pc_apikey',state.apiKey);$('modalApiKey').value=state.apiKey;generateBtn.disabled=!state.apiKey;showToast(state.apiKey?'API Key 已保存':'已清除')});
+  $('modalApiKeySave').addEventListener('click',()=>{state.apiKey=$('modalApiKey').value.trim();localStorage.setItem('pc_apikey',state.apiKey);apiKeyInput.value=state.apiKey;generateBtn.disabled=!state.apiKey;showToast(state.apiKey?'API Key 已保存':'已清除')});
+
+  // Generate
+  generateBtn.addEventListener('click',generateIllustration);
+  exportBtn.addEventListener('click',exportCard);
+
+  // Copy prompt
+  $('copyPromptBtn').addEventListener('click',()=>{
+    navigator.clipboard.writeText(poemPromptTa.value).then(()=>showToast('提示词已复制'));
+  });
+
+  // Regen prompt
+  $('regenPromptBtn').addEventListener('click',()=>{if(state.poem){renderPrompt();showToast('提示词已重新生成')}});
+
+  // Click placeholder to upload illustration
+  cardContent.addEventListener('click',e=>{
+    const ph=e.target.closest('#illustPlaceholder');
+    if(!ph||!state.poem)return;
+    const input=document.createElement('input');
+    input.type='file';input.accept='image/*';
+    input.onchange=ev=>{
+      const file=ev.target.files[0];if(!file)return;
+      const reader=new FileReader();
+      reader.onload=rv=>{setPoemImage(rv.target.result);showToast('插画已上传')};
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  });
+
+  // Paste image
+  document.addEventListener('paste',e=>{
+    if(!state.poem)return;
+    const items=e.clipboardData?.items;if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        const file=item.getAsFile();
+        const reader=new FileReader();
+        reader.onload=rv=>{setPoemImage(rv.target.result);showToast('插画已粘贴')};
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  });
+
+  // Settings modal
+  $('settingsBtn').addEventListener('click',()=>$('settingsModal').classList.add('show'));
+  $('modalClose').addEventListener('click',()=>$('settingsModal').classList.remove('show'));
+  $('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))$('settingsModal').classList.remove('show')});
+}
+
+init();
+</script>
+</body>
+</html>
